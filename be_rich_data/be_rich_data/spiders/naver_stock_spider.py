@@ -1,27 +1,29 @@
-import sys
 import datetime
 import json
 import inspect
+import os
+import sys
 import traceback
 import types
 
 import scrapy
+from scrapy.settings import default_settings as env_settings
 
 from ..utils.parsing import (
     extract_text_and_get_list,
     strip_crlf
 )
+from ..core.spider import BeRichSpider
 
 
-class NaverStockSpider(scrapy.Spider):
-    name = 'naver_stock'
+class NaverFinancialReportSpider(BeRichSpider):
+    name = 'naver_financial_report'
 
     codes = [
-        # '005930', # 한토신
-        '010060', # OCI
-        # '034830',
-        # '093370',
-        # '000660'
+        '005930', # 삼성전자
+        '034830', # 한국토지신
+        '093370',
+        '000660'
     ]
     url = 'http://companyinfo.stock.naver.com/v1/company/c1010001.aspx?cmp_cd={code}'
     # 주요재무정보
@@ -54,11 +56,18 @@ class NaverStockSpider(scrapy.Spider):
             f.write(message)
         self.log('Saved file %s' % filename)
 
-    def _write_result_in_json(self, r):
-        # TODO : write json
-        j = json.dumps(r)
-        with open('./data/', 'rb') as f:
-            f.write(j)
+    # @property
+    # def json_dir_path(self):
+    #     return env_settings['STORAGE_PATH']
+
+    # def _write_result_in_json(self, data, file_name):
+    #     """
+    #     :param data: dict
+    #     :param file_name: str
+    #     """
+    #     j = json.dumps(data)
+    #     with open(self.json_dir_path, 'wb+') as f:
+    #         f.write(j)
 
     def parse(self, response):
         stock_code = response.request.flags[0]
@@ -93,17 +102,11 @@ class NaverStockSpider(scrapy.Spider):
         yearly_partition = period_partitions[:num_yearly_colums]
         quarterly_partition = period_partitions[num_quarterly_column:]
 
-        # yearly_partition_text_list = [strip_crlf(extract_text_and_get_list(yearly_partition))]
         yearly_partition_text_list = [strip_crlf(_) for _ in extract_text_and_get_list(yearly_partition)]
         quarterly_partition_text_list = [strip_crlf(_) for _ in extract_text_and_get_list(quarterly_partition)]
 
-        # for tr in finance_period_partition:
-        #     th_list = tr.css('th')
-        #     for th in th_list:
-        #         text = th.css('::text').extract_first()
 
         finance_info_tr_list = response.css('tbody tr')
-
         fields = []
         values = []
         for tr in finance_info_tr_list:
@@ -120,15 +123,13 @@ class NaverStockSpider(scrapy.Spider):
 
             fields.append(title)
             values.append({
-                'title': title,
+                'title': title.strip(),
                 'yearly': yearly_data,
                 'quarterly': quarterly_data
-
             })
 
         r = {
             'code': stock_code,
-            'name': '!',
         }
 
         for i, year in enumerate(yearly_partition_text_list):
@@ -142,6 +143,10 @@ class NaverStockSpider(scrapy.Spider):
             for f in values:
                 d[f['title']] = f['quarterly'][i]
             r['Q'+quarter] = d
+
+        r_json_str = json.dumps(r)
+        filename = "%s_A" % stock_code
+        self.write_file_to_storage(data=r_json_str, filename=filename, file_format='json')
 
     def _parse_tr(self, tr):
         if not hasattr(tr, "__iter__"):

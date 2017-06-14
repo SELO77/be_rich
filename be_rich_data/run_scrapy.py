@@ -1,7 +1,7 @@
 import sys
 
-
 from scrapy import cmdline
+
 
 def get_spider_name(count=0):
     if count == 0:

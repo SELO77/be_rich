@@ -89,4 +89,6 @@ ROBOTSTXT_OBEY = False
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
-# from .settings.development import *
+import sys
+PROJECT_PATH = sys.path[0]
+STORAGE_PATH = PROJECT_PATH + '/_storage/'
